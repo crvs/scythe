@@ -12,12 +12,14 @@ maintainer:          jfpbdc@kth.se
 -- copyright:           
 category:            Math
 build-type:          Simple
--- extra-source-files:  
+extra-source-files:  
+        examples/toy_hasse.hs
 cabal-version:       >=1.10
 
 library
   exposed-modules:     
         Math.Scythe
+        Math.Graphs
   -- other-modules:       
   -- other-extensions:    
   build-depends:       base >=4.7 && <4.8
