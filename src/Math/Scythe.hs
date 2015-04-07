@@ -1,6 +1,10 @@
 module Math.Scythe where
 
-import Data.List(union,(\\))
+import Control.Monad(liftM)
+import Control.Parallel(par,pseq)
+import Data.List(union,(\\),sort)
+import Math.Graphs
+import System.Process(readProcess)
 
 -- a Hasse diagram is a directed graph associated to a poset where each vertex
 -- is a vertex and each edge is a covering relation (we say that x is covered
@@ -144,4 +148,64 @@ reducepair dgr x y = HasseD $
                     if hy `elem`  over z -- if y covers z then we should add all elements covering x,
                         then ox \\ [hy]  -- except for y, to those covering z
                         else [])
+
+----------------------------------------------------------------------------
+
+sample :: Int          -- number of samples to take
+          -> Int       -- dimensions of the 0-1 box that should be taken
+          -> IO String -- string containing the sampled points
+sample n d = readProcess "rbox" [show n, 'D':show d] []
+
+qhull :: String -- string containing a sample
+         -> IO String -- string containing
+qhull = readProcess "qhull" ["d","i","f"]
+
+
+randomDT :: Int -> Int -> IO [[String]]
+randomDT n d = sample n d
+            >>= qhull
+            >>= return . lines
+            >>= return . (\ x -> take (read . head $ x) (tail x))
+            >>= return . (map (sort . words))
+
+-- given a simplex as a list of vertices, returns all the top-dimensional faces
+faces :: (Eq a,Ord a) => [a] -> [[a]]
+faces l = map (\x -> sort (l \\ [x])) l
+
+complex :: (Eq a,Ord a) => [[a]] -- ss  - list of simplices, that is list of lists of vertices
+                           -> Graph [a] -- resulting digraph representing the simplicial complex
+complex ss = complex' ss newGraph
+    where
+    complex' [] g   = g
+    complex' (s:ss) g
+        | length s == 1 = complex' (tail ss) (addVertex g (vertex s))
+        | otherwise = complex'
+                (ss ++ faces s)
+                (foldl
+                    addEdge g (map pureEdge (zip (faces s) (repeat s)) ) )
+
+------------------------------------------------------------------------------
+
+toHasse :: Eq a => Graph a -> HasseDiagram a
+toHasse (Graph vs es) =
+    procEdges
+        (HasseD ( map (\ (Vert x) -> Hasse x [] []) vs ) )
+        es
+    where
+    procEdges :: Eq a => HasseDiagram a -> [Edge a] -> HasseDiagram a
+    procEdges h [] = h
+    procEdges h ((Edge (Vert v1) (Vert v2)):es) = procEdges
+        (HasseD
+            ( map
+                (\ x ->
+                    if hel x == v1
+                        then Hasse v1 (under x) (over x `union` [v2])
+                        else if hel x == v2
+                            then Hasse v2 (under x `union` [v1]) (over x)
+                            else x)
+                (hlist h)))
+            es
+
+lineshow :: Show a => HasseDiagram a -> String
+lineshow = (map (\ x -> if x == ';' then '\n' else x)) . show
 
