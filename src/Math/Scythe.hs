@@ -161,12 +161,11 @@ qhull :: String -- string containing a sample
 qhull = readProcess "qhull" ["d","i","f"]
 
 
-randomDT :: Int -> Int -> IO [[String]]
-randomDT n d = sample n d
-            >>= qhull
-            >>= return . lines
-            >>= return . (\ x -> take (read . head $ x) (tail x))
-            >>= return . (map (sort . words))
+randomDT :: Int -> Int -> IO [[Int]]
+randomDT n d = liftM ( map (map read . sort . words)
+                    . (\ x -> take (read . head $ x) (tail x))
+                    . lines)
+                    (sample n d >>= qhull)
 
 -- given a simplex as a list of vertices, returns all the top-dimensional faces
 faces :: (Eq a,Ord a) => [a] -> [[a]]
