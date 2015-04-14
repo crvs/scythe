@@ -6,13 +6,18 @@ import Data.List((\\),union)
 type Vertex a = Marked (Marked a)
 -- we mark the vertices twice
 
-markCrit,unmarkCrit :: Vertex a -> Vertex a
-markCrit = fmap markT
-unmarkCrit = fmap markF
+markCrit,unmarkCrit :: Eq a => Graph (Vertex a) -> Vertex a -> Graph (Vertex a)
+markCrit   g v = fmap (\ x -> if x==v then fmap markT x else x) g
+unmarkCrit g v = fmap (\ x -> if x==v then fmap markF x else x) g
 
-markQued,unmarkQued :: Vertex a -> Vertex a
-markQued = markT
-unmarkQued = markF
+markQued,unmarkQued :: Eq a => Graph (Vertex a) -> Vertex a -> Graph (Vertex a)
+markQued g v   = fmap (\ x -> if x==v then markT x else x) g
+unmarkQued g v = fmap (\ x -> if x==v then markF x else x) g
+
+markQuedL,unmarkQuedL :: Eq a => Graph (Vertex a) -> [Vertex a] -> Graph (Vertex a)
+markQuedL g v   = fmap (\ x -> if x `elem` v then markT x else x) g
+unmarkQuedL g v = fmap (\ x -> if x `elem` v then markF x else x) g
+
 
 unmark :: Vertex a -> a
 unmark = label . label
@@ -22,16 +27,16 @@ makeVertex :: a -> Vertex a
 makeVertex x = Mark (Mark x False) False
 
 makeEVertex :: Edge a -> Edge (Vertex a)
-makeEVertex (Edge x y) = Edge (makeVertex x) (makeVertex y)
+makeEVertex = fmap makeVertex
 
 makeGVertex :: Graph a -> Graph (Vertex a)
-makeGVertex (Graph vs es) = Graph (map makeVertex vs) (map makeEVertex es)
+makeGVertex = fmap makeVertex
 
 labelEdge :: Edge (Vertex a) -> Edge a
-labelEdge (Edge x y) = Edge (unmark x) (unmark y)
+labelEdge = fmap unmark
 
 labelGraph :: Graph (Vertex a) -> Graph a
-labelGraph (Graph vs es) = Graph (map unmark vs) (map labelEdge es)
+labelGraph = fmap unmark
 
 crit :: Vertex a -> Bool
 crit = mark.label
@@ -49,31 +54,26 @@ scytheGraph g = (labelGraph . snd)  $ scytheGraphAux ( [] , makeGVertex g )
 
 scytheGraphAux :: Eq a => ( [Vertex a] , Graph(Vertex a) ) -> ( [Vertex a] , Graph(Vertex a) )
 scytheGraphAux ( q , g )
-    | null $ nonCritG g = ( [] , g )
-    | null q            = scytheGraphAux ( [c] , bigD ) -- the queue has been emptied, new big loop
+    | null $ nonCritG g = ( [] , g ) -- termination
+    | null q            = scytheGraphAux ( [c] , bigD )-- the queue has been emptied, new big loop
     | otherwise         = scytheGraphAux ( nQueue , smallD ) -- queue has elements, execute the loop
     where
-        c = head $ filter (null . nonCrit . incoming g) (nonCritG g) -- minimal non-critical element
-        bigD = Graph -- g with c marked as critical an queued
-               (map (\x -> if x == c then (markQued . markCrit) x else unmarkQued x) (vertices g))
-               (edges g)
-        nQueue = tail q `union` filter (not.mark) ms
-        y = head q
-        smallD = if (length . nonCritUnder g) y == 1
-                 then reducePair g (head (nonCritUnder g y)) y
-                 else g
-        ms = if (length . nonCritUnder g) y == 1
-             then outgoing g y `union` outgoing g (head $ nonCritUnder g y)
-             else outgoing g y
+        ----------- in case where the queue is empty
+        (c:_) = filter (null . nonCrit . incoming g) (nonCritG g) -- minimal non-critical element
+        bigD = markQued (markCrit g  c) c -- g with c marked as critical and queued
+        ----------- for the remaninig cases
+        (y:ys) = q
+        nQueue = ys `union` filter (not.mark) ms
+        xs = nonCritUnder g y
+        (smallD , ms) = if length xs  == 1 && (not.crit) y
+                 then let (x:_) = xs in
+                     (reducePair g x y , outgoing g y `union` outgoing g x)
+                 else (g , outgoing g y)
 
 reducePair :: Eq a => Graph (Vertex a) -> Vertex a -> Vertex a -> Graph (Vertex a)
-reducePair g x y = Graph
-        (map (\ t -> if t `elem` (outgoing g x ++ outgoing g y) then markQued t else t) (vertices g'))
-        (edges g' `union` [Edge z w | z <- outgoing g x \\ [y], w <- incoming g y \\ [x]])
+reducePair g x y = foldl addEdge (markQuedL g' (outgoing g x ++ outgoing g y)) [Edge w z | w <- incoming g y \\ [x] ,  z <- outgoing g x \\ [y] ]
     where
-    g' = Graph
-         (vertices g \\ [x,y])
-         (edges g \\ (includingE g x `union` includingE g y))
+    g' = remVertexL g [x,y]
 
 outgoingE,incomingE,includingE :: Eq a => Graph a -> a -> [Edge a]
 incomingE g x = map (flip Edge x) (incoming g x)
@@ -82,3 +82,4 @@ includingE g x = incomingE g x `union` outgoingE g x
 
 nonCritUnder :: Eq a => Graph (Vertex a) -> Vertex a -> [Vertex a]
 nonCritUnder g v = nonCrit $ incoming g v
+

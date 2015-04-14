@@ -21,8 +21,9 @@ source-repository head
     location:        https://www.github.com/crvs/scythe
 
 library
-  exposed-modules:   Math.ScytheGraph
-                     Math.Graphs
+  exposed-modules:   Math.Graphs ,
+                     Math.ScytheGraph ,
+                     Math.Simplicial
   -- other-modules:
   -- other-extensions:
   build-depends:       base >=4.7 && <5.0,

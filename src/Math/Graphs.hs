@@ -13,10 +13,16 @@ import Data.List(union,(\\))
 data Edge a = Edge { from :: a , to :: a }
     deriving Eq
 
+instance Functor Edge where
+    fmap f (Edge s t) = Edge (f s) (f t)
+
 instance Show a => Show (Edge a) where
     show (Edge v1 v2) = "(" ++ show v1 ++ "--" ++ show v2 ++ ")"
 
 data Graph a = Graph { vertices :: [a] , edges :: [Edge a]}
+
+instance Functor Graph where
+    fmap f (Graph vs es) = Graph (map f vs) (map (fmap f) es)
 
 instance Show a => Show (Graph a) where
     show (Graph vs es) = show vs ++ "\n" ++ show es
@@ -61,18 +67,21 @@ incoming g v = map from (filter ((==v) . to)   (edges g))
 outgoing g v = map to   (filter ((==v) . from) (edges g))
 
 addEdge :: Eq a => Graph a -> Edge a -> Graph a
-addEdge g e = Graph (vertices g `union` [from e,to e]) (edges g `union` [e])
+addEdge g e = Graph ((vertices g \\ [f,t]) ++ [f,t]) (edges g `union` [e])
+    where [f,t] = [from e,to e]
 
 addVertex :: Eq a => Graph a -> a -> Graph a
-addVertex (Graph vs es) v = if v `elem` vs
-    then Graph vs es -- we fail silently
-    else Graph (v:vs) es
+addVertex (Graph vs es) v = Graph vs' es
+    where vs' = (vs \\ [v]) ++ [v]
 
 edge :: (a,a) -> Edge a
 edge (x,y) = Edge x y
 
 remVertex :: Eq a => Graph a -> a -> Graph a
 remVertex (Graph vs es) v = Graph (vs \\ [v]) (filter (\x -> from x /= v && to x /= v) es)
+
+remVertexL :: Eq a => Graph a -> [a] -> Graph a
+remVertexL (Graph vs es) l = Graph (vs \\ l) (filter (\x -> from x `notElem` l && to x `notElem` l) es)
 
 graphUnion :: Eq a => Graph a -> Graph a -> Graph a
 graphUnion ga gb = Graph (vertices ga `union` vertices gb) (edges ga `union` edges gb)
