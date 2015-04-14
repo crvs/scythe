@@ -1,4 +1,4 @@
-module Something where
+
 import Math.Scythe
 
 main :: IO ()
