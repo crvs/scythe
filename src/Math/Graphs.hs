@@ -2,6 +2,7 @@ module Math.Graphs where
 
 import Control.Monad
 import Control.Applicative
+import Data.Monoid(Monoid,mempty,mappend)
 import Data.List(union,(\\))
 -- import qualified Data.ByteString.Char8 as B
 
@@ -20,6 +21,10 @@ instance Show a => Show (Edge a) where
     show (Edge v1 v2) = "(" ++ show v1 ++ "--" ++ show v2 ++ ")"
 
 data Graph a = Graph { vertices :: [a] , edges :: [Edge a]}
+
+instance Eq a => Monoid (Graph a) where
+    mempty = newGraph
+    mappend = graphUnion
 
 instance Functor Graph where
     fmap f (Graph vs es) = Graph (map f vs) (map (fmap f) es)
@@ -67,7 +72,7 @@ incoming g v = map from (filter ((==v) . to)   (edges g))
 outgoing g v = map to   (filter ((==v) . from) (edges g))
 
 addEdge :: Eq a => Graph a -> Edge a -> Graph a
-addEdge g e = Graph ((vertices g \\ [f,t]) ++ [f,t]) (edges g `union` [e])
+addEdge g e = Graph ((vertices g \\ [f,t]) `union` [f,t]) (edges g `union` [e])
     where [f,t] = [from e,to e]
 
 addVertex :: Eq a => Graph a -> a -> Graph a
