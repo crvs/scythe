@@ -71,7 +71,13 @@ scytheGraphAux ( q , g )
                  else (g , outgoing g y)
 
 reducePair :: Eq a => Graph (Vertex a) -> Vertex a -> Vertex a -> Graph (Vertex a)
-reducePair g x y = foldl addEdge (markQuedL g' (outgoing g x ++ outgoing g y)) [Edge w z | w <- incoming g y \\ [x] ,  z <- outgoing g x \\ [y] ]
+reducePair g x y = foldl addEdge (markQuedL g' (outgoing g x ++ outgoing g y)) (
+    [edge (w,z) | w <- incoming g y \\ [x] ,  z <- outgoing g x \\ [y] ] ++ -- add relations described by reducepair
+    [edge (w,z) | w <- incoming g x ,  z <- outgoing g x \\ [y] ] ++ -- preserve second order relations that the removal destroys
+    [edge (w,z) | w <- incoming g y \\ [x] ,  z <- outgoing g y ] ++ -- preserve second order relations that the removal destroys
+    [edge (w,z) | w <- incoming g x ,  z <- outgoing g y ] -- preserve third order relations that the removal destroys
+    -- the presheaf condition makes sure that all these operations make sense
+    )
     where
     g' = remVertexL g [x,y]
 
